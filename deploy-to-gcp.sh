@@ -2,11 +2,11 @@
 set -e
 
 # Default values
-PROJECT_ID=${PROJECT_ID:-"image-clipper"}
+PROJECT_ID=${PROJECT_ID:-"image-clipper-app"}
 GCP_REGION=${GCP_REGION:-"asia-south1"}  # Mumbai, India
 MODEL_TYPE=${MODEL_TYPE:-"vit_h"}
-MEMORY=${MEMORY:-"2Gi"}
-CPU=${CPU:-"2"}
+MEMORY=${MEMORY:-"4Gi"}
+CPU=${CPU:-"4"}
 
 # Display header
 echo "===== Image Clipper GCP Deployment ====="

@@ -1,0 +1,58 @@
+steps:
+# Build backend image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/${PROJECT_ID}/image-clipper-backend', '-f', 'backend/Dockerfile.gcp', './backend']
+
+# Build frontend image
+- name: 'gcr.io/cloud-builders/docker'
+  args: ['build', '-t', 'gcr.io/${PROJECT_ID}/image-clipper-frontend', './frontend']
+
+# Deploy backend to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'gcloud'
+  args:
+    - 'run'
+    - 'deploy'
+    - 'image-clipper-backend'
+    - '--image'
+    - 'gcr.io/${PROJECT_ID}/image-clipper-backend'
+    - '--platform'
+    - 'managed'
+    - '--region'
+    - '${_REGION}'
+    - '--memory'
+    - '${_MEMORY}'
+    - '--cpu'
+    - '${_CPU}'
+    - '--set-env-vars'
+    - 'SAM_MODEL_TYPE=${_MODEL_TYPE},DEBUG=False'
+    - '--allow-unauthenticated'
+
+# Deploy frontend to Cloud Run
+- name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+  entrypoint: 'gcloud'
+  args:
+    - 'run'
+    - 'deploy'
+    - 'image-clipper-frontend'
+    - '--image'
+    - 'gcr.io/${PROJECT_ID}/image-clipper-frontend'
+    - '--platform'
+    - 'managed'
+    - '--region'
+    - '${_REGION}'
+    - '--set-env-vars'
+    - 'NEXT_PUBLIC_API_URL=https://image-clipper-backend-${PROJECT_ID}.a.run.app'
+    - '--allow-unauthenticated'
+
+images:
+- 'gcr.io/${PROJECT_ID}/image-clipper-backend'
+- 'gcr.io/${PROJECT_ID}/image-clipper-frontend'
+
+substitutions:
+  _REGION: 'asia-south1'
+  _MODEL_TYPE: 'vit_h'
+  _MEMORY: '4Gi'
+  _CPU: '4'
+
+timeout: '3600s'
