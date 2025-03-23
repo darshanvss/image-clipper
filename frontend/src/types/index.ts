@@ -14,6 +14,7 @@ export interface ImageState {
   error: string | null;
   showBackground: boolean;
   compositeImageUrl: string | null;
+  processingProgress: string | null;
 }
 
 export interface Point {

@@ -178,8 +178,42 @@ async def segment_image(file: UploadFile = File(...)):
         # Read the image
         logger.info("Reading uploaded image...")
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        image_np = np.array(image)
+        
+        # Validate image file
+        try:
+            image = Image.open(io.BytesIO(contents)).convert("RGB")
+            
+            # Get original image dimensions
+            original_width, original_height = image.size
+            logger.info(f"Original image dimensions: {original_width}x{original_height}")
+            
+            # Resize large images to prevent memory issues with SAM
+            max_dimension = 1024  # Maximum dimension to process with SAM
+            if original_width > max_dimension or original_height > max_dimension:
+                logger.info(f"Resizing image for processing (original size: {original_width}x{original_height})")
+                # Calculate new dimensions while maintaining aspect ratio
+                if original_width > original_height:
+                    new_width = max_dimension
+                    new_height = int(original_height * (max_dimension / original_width))
+                else:
+                    new_height = max_dimension
+                    new_width = int(original_width * (max_dimension / original_height))
+                
+                # Resize image for processing
+                image_for_processing = image.resize((new_width, new_height), Image.LANCZOS)
+                logger.info(f"Resized to {new_width}x{new_height} for processing")
+            else:
+                image_for_processing = image
+                
+        except Exception as e:
+            logger.error(f"Invalid image file: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid image file. Please upload a valid image."}
+            )
+            
+        # Convert to numpy array
+        image_np = np.array(image_for_processing)
         
         # Set the image for the predictor
         logger.info("Setting image for prediction...")
@@ -187,16 +221,28 @@ async def segment_image(file: UploadFile = File(...)):
         
         # Get automatic masks (we'll refine with user clicks in the frontend)
         logger.info("Generating automatic masks...")
-        masks, _, _ = local_predictor.predict(
-            point_coords=None,
-            point_labels=None,
-            multimask_output=True
-        )
+        try:
+            masks, scores, _ = local_predictor.predict(
+                point_coords=None,
+                point_labels=None,
+                multimask_output=True
+            )
+        except RuntimeError as e:
+            logger.error(f"Runtime error during prediction: {str(e)}")
+            if "out of memory" in str(e).lower():
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Out of memory while processing image. Try a smaller image or increase server memory."}
+                )
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"Error during prediction: {str(e)}"}
+            )
         
         # Prepare masks for frontend
         logger.info(f"Processing {len(masks)} masks for response...")
         mask_results = []
-        for i, mask in enumerate(masks):
+        for i, (mask, score) in enumerate(zip(masks, scores)):
             mask_binary = mask.astype(np.uint8) * 255
             mask_img = Image.fromarray(mask_binary)
             buffered = io.BytesIO()
@@ -205,11 +251,23 @@ async def segment_image(file: UploadFile = File(...)):
             
             mask_results.append({
                 "id": i,
-                "mask": mask_base64
+                "mask": mask_base64,
+                "score": float(score)
             })
         
+        # Sort masks by score (best masks first)
+        mask_results.sort(key=lambda x: x["score"], reverse=True)
+        
+        # Convert original image to base64 as well
+        buffered = io.BytesIO()
+        image.save(buffered, format="PNG")
+        image_base64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        
         logger.info("Successfully completed segment-image request")
-        return {"masks": mask_results}
+        return {
+            "masks": mask_results,
+            "original_image": image_base64
+        }
     
     except Exception as e:
         logger.error(f"Error in segment_image: {str(e)}")
@@ -239,16 +297,65 @@ async def segment_with_points(
             )
         
         # Parse points
-        logger.info("Parsing points data...")
-        points_data = json.loads(points)
-        point_coords = np.array([p[:2] for p in points_data])
-        point_labels = np.array([p[2] for p in points_data])
+        try:
+            logger.info("Parsing points data...")
+            points_data = json.loads(points)
+            point_coords = np.array([p[:2] for p in points_data])
+            point_labels = np.array([p[2] for p in points_data])
+        except json.JSONDecodeError:
+            logger.error("Invalid JSON in points data")
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid points data format. Expected JSON array."}
+            )
         
         # Read the image
         logger.info("Reading uploaded image...")
         contents = await file.read()
-        image = Image.open(io.BytesIO(contents)).convert("RGB")
-        image_np = np.array(image)
+        
+        # Validate image file
+        try:
+            image = Image.open(io.BytesIO(contents)).convert("RGB")
+            
+            # Get original image dimensions
+            original_width, original_height = image.size
+            logger.info(f"Original image dimensions: {original_width}x{original_height}")
+            
+            # Resize large images to prevent memory issues with SAM
+            max_dimension = 1024  # Maximum dimension to process with SAM
+            if original_width > max_dimension or original_height > max_dimension:
+                logger.info(f"Resizing image for processing (original size: {original_width}x{original_height})")
+                # Calculate new dimensions while maintaining aspect ratio
+                if original_width > original_height:
+                    new_width = max_dimension
+                    new_height = int(original_height * (max_dimension / original_width))
+                else:
+                    new_height = max_dimension
+                    new_width = int(original_width * (max_dimension / original_height))
+                
+                # Resize image for processing
+                image_for_processing = image.resize((new_width, new_height), Image.LANCZOS)
+                
+                # Adjust point coordinates based on resize ratio
+                width_ratio = new_width / original_width
+                height_ratio = new_height / original_height
+                
+                for i in range(len(point_coords)):
+                    point_coords[i][0] = int(point_coords[i][0] * width_ratio)
+                    point_coords[i][1] = int(point_coords[i][1] * height_ratio)
+                
+                logger.info(f"Resized to {new_width}x{new_height} for processing and adjusted point coordinates")
+            else:
+                image_for_processing = image
+                
+        except Exception as e:
+            logger.error(f"Invalid image file: {str(e)}")
+            return JSONResponse(
+                status_code=400,
+                content={"detail": "Invalid image file. Please upload a valid image."}
+            )
+        
+        image_np = np.array(image_for_processing)
         
         # Set the image for the predictor
         logger.info("Setting image for prediction...")
@@ -257,19 +364,36 @@ async def segment_with_points(
         # Previous mask input handling
         mask_input_array = None
         if mask_input:
-            logger.info("Processing previous mask input...")
-            mask_bytes = base64.b64decode(mask_input)
-            mask_image = Image.open(io.BytesIO(mask_bytes)).convert('L')
-            mask_input_array = np.array(mask_image) > 0
+            try:
+                logger.info("Processing previous mask input...")
+                mask_bytes = base64.b64decode(mask_input)
+                mask_image = Image.open(io.BytesIO(mask_bytes)).convert('L')
+                mask_input_array = np.array(mask_image) > 0
+            except Exception as e:
+                logger.error(f"Error processing mask input: {str(e)}")
+                # Continue without mask input if it fails
+                mask_input_array = None
         
         # Get masks with point prompts
         logger.info("Generating masks with point prompts...")
-        masks, scores, _ = local_predictor.predict(
-            point_coords=point_coords,
-            point_labels=point_labels,
-            mask_input=mask_input_array,
-            multimask_output=True
-        )
+        try:
+            masks, scores, _ = local_predictor.predict(
+                point_coords=point_coords,
+                point_labels=point_labels,
+                mask_input=mask_input_array,
+                multimask_output=True
+            )
+        except RuntimeError as e:
+            logger.error(f"Runtime error during prediction: {str(e)}")
+            if "out of memory" in str(e).lower():
+                return JSONResponse(
+                    status_code=500,
+                    content={"detail": "Out of memory while processing image. Try a smaller image or increase server memory."}
+                )
+            return JSONResponse(
+                status_code=500,
+                content={"detail": f"Error during prediction: {str(e)}"}
+            )
         
         # Prepare masks for frontend
         logger.info(f"Processing {len(masks)} masks for response...")

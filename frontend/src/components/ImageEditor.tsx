@@ -96,10 +96,26 @@ const ImageEditor: React.FC = () => {
                       }`}
                     >
                       <div className="w-full h-full bg-muted bg-opacity-40 flex items-center justify-center">
-                        <img 
-                          src={`data:image/png;base64,${mask.mask}`} 
-                          alt={`Segment ${mask.id}`} 
-                          className="max-w-full max-h-full object-contain"
+                        {/* Original image as background */}
+                        {originalImageUrl && (
+                          <img 
+                            src={originalImageUrl} 
+                            alt="Background" 
+                            className="absolute top-0 left-0 w-full h-full object-cover opacity-50"
+                          />
+                        )}
+                        {/* Colorized mask */}
+                        <div 
+                          className="absolute top-0 left-0 w-full h-full" 
+                          style={{ 
+                            backgroundImage: `url(data:image/png;base64,${mask.mask})`, 
+                            backgroundSize: 'contain',
+                            backgroundPosition: 'center',
+                            backgroundRepeat: 'no-repeat',
+                            backgroundColor: 'transparent',
+                            filter: `hue-rotate(${mask.id * 60}deg) saturate(1.5)`, 
+                            mixBlendMode: 'multiply',
+                          }}
                         />
                       </div>
                       

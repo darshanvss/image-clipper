@@ -10,7 +10,7 @@ interface ImageUploaderProps {
 }
 
 const ImageUploader: React.FC<ImageUploaderProps> = ({ fullScreen = false }) => {
-  const { setOriginalImage, segmentImage, loading } = useImageStore();
+  const { setOriginalImage, segmentImage, loading, processingProgress, error } = useImageStore();
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
@@ -89,7 +89,14 @@ const ImageUploader: React.FC<ImageUploaderProps> = ({ fullScreen = false }) => 
             {loading && (
               <div className="mt-4">
                 <div className="animate-spin rounded-full h-8 w-8 border-4 border-primary border-t-transparent"></div>
-                <p className="mt-2 text-sm text-muted-foreground">Processing image...</p>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  {processingProgress || 'Processing image...'}
+                </p>
+              </div>
+            )}
+            {error && !loading && (
+              <div className="mt-4 text-red-500 text-sm max-w-md">
+                <p>{error}</p>
               </div>
             )}
           </div>

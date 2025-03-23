@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useImageStore } from "../store/imageStore";
 import { useDropzone } from 'react-dropzone';
 import { toast } from 'react-toastify';
-import { FaUpload, FaFileImage, FaCopy, FaDownload, FaTrash, FaCheck } from 'react-icons/fa';
+import { FaUpload, FaFileImage, FaCopy, FaDownload, FaTrash, FaCheck, FaExclamationTriangle } from 'react-icons/fa';
 
 // Import Shadcn components
 import { Button } from "@/components/ui/button"
@@ -12,11 +12,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/componen
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 
 export default function Home() {
   // Important to avoid hydration issues with SSR
   const [isClient, setIsClient] = useState(false);
   const [copiedToClipboard, setCopiedToClipboard] = useState(false);
+  const [loadingMessage, setLoadingMessage] = useState("Processing Image");
 
   const {
     originalImage,
@@ -24,6 +26,7 @@ export default function Home() {
     masks,
     selectedMasks,
     loading,
+    error,
     showBackground,
     compositeImageUrl,
     setOriginalImage,
@@ -37,6 +40,13 @@ export default function Home() {
   useEffect(() => {
     setIsClient(true);
   }, []);
+
+  // Show error toast when error occurs
+  useEffect(() => {
+    if (error) {
+      toast.error(error);
+    }
+  }, [error]);
 
   // Generate composite image when selection changes
   useEffect(() => {
@@ -66,7 +76,9 @@ export default function Home() {
         
         // Automatically segment the image after upload
         try {
+          setLoadingMessage("Uploading image...");
           await segmentImage();
+          setLoadingMessage("Generating masks...");
         } catch (error) {
           console.error('Error segmenting image:', error);
           toast.error('Failed to segment image. Please try again.');
@@ -151,6 +163,15 @@ export default function Home() {
             </Button>
           )}
         </header>
+
+        {/* Error display */}
+        {error && (
+          <Alert variant="destructive" className="mb-4">
+            <FaExclamationTriangle className="h-4 w-4 mr-2" />
+            <AlertTitle>Error</AlertTitle>
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Main content */}
         <Card className="overflow-hidden">
@@ -336,10 +357,13 @@ export default function Home() {
           <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
             <Card className="w-[300px]">
               <CardHeader>
-                <CardTitle className="text-center">Processing Image</CardTitle>
+                <CardTitle className="text-center">{loadingMessage}</CardTitle>
               </CardHeader>
-              <CardContent className="flex justify-center pb-6">
+              <CardContent className="flex flex-col items-center pb-6 gap-4">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent"></div>
+                <p className="text-sm text-muted-foreground text-center">
+                  This may take a few moments depending on image size...
+                </p>
               </CardContent>
             </Card>
           </div>

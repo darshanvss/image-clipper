@@ -14,15 +14,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Create a models directory to mount the model
+# Create models directory
 RUN mkdir -p /app/models
 
-# Add model download command - uncomment and use this for cloud deployment
-# For cloud deployment, we'll need to download the model at build time
+# Download the SAM model at build time instead of copying from local
 RUN curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -o /app/models/sam_vit_h_4b8939.pth
 
 # Copy application code
 COPY ./app /app/app
+
+# Set environment variables for performance tuning
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    UVICORN_WORKERS=4 \
+    UVICORN_TIMEOUT=300
 
 # Expose the API port
 EXPOSE 8000
@@ -31,5 +36,5 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:8000/ || exit 1
 
-# Command to run the application
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Command to run the application with optimized settings for production
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4", "--timeout-keep-alive", "75"] 
