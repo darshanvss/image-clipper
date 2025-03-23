@@ -9,7 +9,8 @@ services:
       - ./backend/app:/app/app
       - ./backend/checkpoints:/app/checkpoints
     environment:
-      - MODEL_PATH=/app/checkpoints/sam_vit_h_4b8939.pth
+      - SAM_MODEL_TYPE=vit_b
+      - CHECKPOINTS_DIR=/app/checkpoints
       - DEBUG=True
 
   frontend:

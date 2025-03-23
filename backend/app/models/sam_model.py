@@ -5,8 +5,31 @@ from segment_anything import sam_model_registry, SamPredictor
 import logging
 import cv2
 from typing import List, Tuple, Dict, Any, Optional
+import requests
+import urllib.request
+import tempfile
+import shutil
 
 logger = logging.getLogger(__name__)
+
+# Available SAM model checkpoints
+SAM_MODELS = {
+    "vit_h": {
+        "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
+        "size": "2.4GB",
+        "description": "ViT-H SAM model (largest, most accurate)"
+    },
+    "vit_l": {
+        "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
+        "size": "1.2GB",
+        "description": "ViT-L SAM model (medium size and accuracy)"
+    },
+    "vit_b": {
+        "url": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth",
+        "size": "375MB",
+        "description": "ViT-B SAM model (smallest, fastest)"
+    }
+}
 
 class SAMModel:
     def __init__(self):
@@ -20,25 +43,27 @@ class SAMModel:
     def _load_model(self):
         """Load the SAM model."""
         try:
-            # Get model path from env or use default
-            model_path = os.environ.get('MODEL_PATH', './checkpoints/sam_vit_h_4b8939.pth')
-            model_type = "vit_h"  # Use the appropriate model type based on your checkpoint
+            # Get model parameters from env or use defaults
+            model_type = os.environ.get('SAM_MODEL_TYPE', "vit_b")  # Default to smaller vit_b model
+            checkpoints_dir = os.environ.get('CHECKPOINTS_DIR', './checkpoints')
             
-            logger.info(f"Loading SAM model from {model_path}...")
+            # Validate model type
+            if model_type not in SAM_MODELS:
+                logger.warning(f"Invalid model type: {model_type}. Falling back to vit_b.")
+                model_type = "vit_b"
+                
+            # Get model info
+            model_info = SAM_MODELS[model_type]
+            model_filename = os.path.basename(model_info["url"])
+            model_path = os.path.join(checkpoints_dir, model_filename)
+            
+            logger.info(f"Using SAM model: {model_type} ({model_info['description']})")
+            logger.info(f"Model path: {model_path}")
             
             # Download model if it doesn't exist
             if not os.path.exists(model_path):
-                logger.info("Model checkpoint not found. Downloading...")
-                # Create checkpoints directory if it doesn't exist
-                os.makedirs(os.path.dirname(model_path), exist_ok=True)
-                
-                # Download the model - this is a placeholder
-                # In a real implementation, use requests or similar to download from a URL
-                raise FileNotFoundError(
-                    f"Model not found at {model_path}. Please download the model from "
-                    "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth "
-                    "and place it in the checkpoints directory."
-                )
+                logger.info(f"Model checkpoint not found. Downloading {model_type} model ({model_info['size']})...")
+                self._download_model(model_info["url"], model_path)
             
             # Initialize the SAM model
             sam = sam_model_registry[model_type](checkpoint=model_path)
@@ -46,10 +71,51 @@ class SAMModel:
             
             # Create the predictor
             self.predictor = SamPredictor(sam)
-            logger.info("SAM model loaded successfully")
+            logger.info(f"SAM model {model_type} loaded successfully")
             
         except Exception as e:
             logger.error(f"Error loading SAM model: {e}")
+            raise
+    
+    def _download_model(self, url: str, destination: str):
+        """Download the model from the given URL to the destination path."""
+        try:
+            # Create directory if it doesn't exist
+            os.makedirs(os.path.dirname(destination), exist_ok=True)
+            
+            # Download with progress reporting
+            logger.info(f"Downloading from {url} to {destination}")
+            
+            # Stream download to temporary file then move to final location
+            # This prevents incomplete downloads
+            with tempfile.NamedTemporaryFile(delete=False) as temp_file:
+                with urllib.request.urlopen(url) as response:
+                    total_size = int(response.info().get('Content-Length', 0))
+                    downloaded = 0
+                    chunk_size = 1024 * 1024  # 1MB
+                    
+                    while True:
+                        chunk = response.read(chunk_size)
+                        if not chunk:
+                            break
+                        
+                        temp_file.write(chunk)
+                        downloaded += len(chunk)
+                        
+                        # Log progress
+                        if total_size > 0:
+                            percent = int(100 * downloaded / total_size)
+                            logger.info(f"Downloaded {downloaded} / {total_size} bytes ({percent}%)")
+            
+            # Move the temporary file to the destination
+            shutil.move(temp_file.name, destination)
+            logger.info(f"Download complete: {destination}")
+            
+        except Exception as e:
+            logger.error(f"Error downloading model: {e}")
+            # Clean up temporary file if it exists
+            if 'temp_file' in locals() and os.path.exists(temp_file.name):
+                os.unlink(temp_file.name)
             raise
 
     def set_image(self, image: np.ndarray):

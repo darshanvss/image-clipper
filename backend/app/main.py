@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 import logging
 
 from app.routers import segmentation
+from app.models.sam_model import SAM_MODELS, get_model
 
 # Configure logging
 logging.basicConfig(
@@ -46,4 +47,19 @@ async def root():
 @app.get("/api/health")
 async def health_check():
     """Health check endpoint for the API."""
-    return {"status": "healthy", "api_version": "1.0.0"} 
+    return {"status": "healthy", "api_version": "1.0.0"}
+
+@app.get("/api/v1/models")
+async def get_available_models():
+    """Get information about available SAM models and the current model in use."""
+    # Get the current model instance
+    model = get_model()
+    
+    # Get the current model type from environment
+    current_model_type = os.environ.get('SAM_MODEL_TYPE', 'vit_b')
+    
+    return {
+        "available_models": SAM_MODELS,
+        "current_model": current_model_type,
+        "device": str(model.device)
+    } 

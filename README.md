@@ -43,10 +43,10 @@ The application is split into two parts:
    cd image-clipper
    ```
 
-2. Download the SAM model checkpoint:
+2. Download the SAM model checkpoint (or let the application download it automatically):
    ```
    mkdir -p backend/checkpoints
-   curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -o backend/checkpoints/sam_vit_h_4b8939.pth
+   curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -o backend/checkpoints/sam_vit_b_01ec64.pth
    ```
 
 3. Start the application with Docker Compose:
@@ -76,10 +76,10 @@ The application is split into two parts:
    pip install -r requirements.txt
    ```
 
-4. Download the SAM model checkpoint:
+4. Download the SAM model checkpoint (or let the application download it automatically):
    ```
    mkdir -p checkpoints
-   curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth -o checkpoints/sam_vit_h_4b8939.pth
+   curl -L https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth -o checkpoints/sam_vit_b_01ec64.pth
    ```
 
 5. Start the backend server:
