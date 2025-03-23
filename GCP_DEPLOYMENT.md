@@ -19,7 +19,7 @@ This document provides instructions for deploying the Image Clipper application 
 ```bash
 # Set your GCP project ID
 export PROJECT_ID=image-clipper
-export GCP_REGION=us-central1  # Choose your preferred region
+export GCP_REGION=asia-south1  # Mumbai, India
 ```
 
 ### 2. Authenticate Docker with GCP

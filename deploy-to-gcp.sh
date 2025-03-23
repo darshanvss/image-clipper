@@ -3,7 +3,7 @@ set -e
 
 # Default values
 PROJECT_ID=${PROJECT_ID:-"image-clipper"}
-GCP_REGION=${GCP_REGION:-"us-central1"}
+GCP_REGION=${GCP_REGION:-"asia-south1"}  # Mumbai, India
 MODEL_TYPE=${MODEL_TYPE:-"vit_h"}
 MEMORY=${MEMORY:-"2Gi"}
 CPU=${CPU:-"2"}
