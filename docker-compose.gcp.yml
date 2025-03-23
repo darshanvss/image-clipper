@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend/checkpoints:/app/checkpoints
+    environment:
+      - SAM_MODEL_TYPE=vit_h
+      - CHECKPOINTS_DIR=/app/checkpoints
+      - DEBUG=False
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - /app/node_modules
+    depends_on:
+      - backend
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000 

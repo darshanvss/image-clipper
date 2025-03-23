@@ -1,0 +1,39 @@
+FROM python:3.10-slim
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy requirements and install dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY ./app /app/app
+
+# Create checkpoints directory
+RUN mkdir -p /app/checkpoints
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PORT=8000
+ENV SAM_MODEL_TYPE=vit_h
+ENV CHECKPOINTS_DIR=/app/checkpoints
+ENV DEBUG=False
+
+# Option to pre-download the model during build (commented out by default)
+# Note: Uncommenting will make the image much larger but will improve cold start time
+# RUN python -c "from app.models.sam_model import get_model; get_model()"
+
+# Expose port for the application
+EXPOSE ${PORT}
+
+# Command to run the application
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"] 
